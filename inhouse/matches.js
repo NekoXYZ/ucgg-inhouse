@@ -272,8 +272,8 @@ module.exports = {
 			match.set("modifierVotes3", new Array());
 
 			const modifier1 = client.PickModifier(modifiers.modifiers);
-			const modifier2 = client.PickModifier(modifiers.modifiers, [modifier1]);
-			const modifier3 = client.PickModifier(modifiers.modifiers, [modifier1, modifier2]);
+			const modifier2 = client.PickModifier(modifiers.modifiers, [modifier1.value]);
+			const modifier3 = client.PickModifier(modifiers.modifiers, [modifier1.value, modifier2.value]);
 
 			match.set("modifier1", modifier1);
 			match.set("modifier2", modifier2);
