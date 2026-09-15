@@ -190,38 +190,6 @@ const shopItems = {
 			"value": Use.GAME,
 		},
 	},
-	"black market": {
-		"mvp_h4ck.exe": {
-			"cost": 50,
-			"description": "Gain one MVP.",
-			"value": Use.WHENEVER,
-		},
-		"Mandatory Meeting": {
-			"cost": 1000,
-			"description": "You get a 10 minute voice call with mellowcholy. Voice WILL be used.",
-			"value": Use.WHENEVER,
-		},
-		"uN5T4BL3_TR4N5F3R.bat": {
-			"cost": 100,
-			"description": "50/50 chance between stealing 50 credits from someone, or them stealing it from you.",
-			"value": Use.WHENEVER,
-		},
-		"ALERT.sys": {
-			"cost": 50,
-			"description": "Ping someone at a random time.",
-			"value": Use.WHENEVER,
-		},
-		"DEAD_MANS_SWITCH.dll": {
-			"cost": 35,
-			"description": "If you lose the current game, no one gains any credits.",
-			"value": Use.PREWHEELVOTE,
-		},
-		"FIREWALL.sh": {
-			"cost": 50,
-			"description": "Block the next black market attack on you. [NOT STACKABLE]",
-			"value": Use.PREWHEELVOTE,
-		},
-	},
 };
 
 // add champion profiles
