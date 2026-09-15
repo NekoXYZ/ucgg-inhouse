@@ -173,21 +173,13 @@ const shopItems = {
 		},
 	},
 	"tickets": {
-		"4x Credits Ticket": {
-			"cost": 30,
-			"description": "Using this ticket will make everyone in the match gain 4x credits! [NOT STACKABLE]",
-			"value": "4xcredits",
-			"use": Use.GAME,
-		},
 		"One-Trick Ticket": {
 			"cost": 30,
-			"description": "Using this ticket will ensure you get your champion! [NOT VALID FOR WHEEL GAMES]",
-			"value": Use.GAME,
+			"description": "Using this ticket will ensure you get your champion!",
 		},
 		"Extra Ban Ticket": {
 			"cost": 30,
-			"description": "Using this ticket will allow you to ban one extra champion! [NOT VALID FOR WHEEL GAMES]",
-			"value": Use.GAME,
+			"description": "Using this ticket will allow you to ban one extra champion!",
 		},
 	},
 };
