@@ -3,7 +3,7 @@ const { SlashCommandBuilder, InteractionContextType } = require("discord.js");
 module.exports = {
 	data: new SlashCommandBuilder()
 		.setName("ticket")
-		.setDescription("Use a ticket in your inventory")
+		.setDescription("[USE ONLY IN A MATCH CHANNEL] Use a ticket in your inventory.")
 		.addStringOption((option) => option
 			.setName("item")
 			.setDescription("The name of the item you want to use.")

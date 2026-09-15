@@ -1,13 +1,6 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
-const Use = {
-	WHENEVER: 0, // u can use this ticket whenever
-	PREWHEELVOTE: 1, // u can only use this ticket before the wheel vote
-	POSTWHEELVOTE: 2, // u can only use this ticket after the wheel vote
-	GAME: 3, // u can only use this ticket during a game (prewheelvote + postwheelvote)
-};
-
 const shopItems = {
 	"profiles": {
 		"Modern White": {
