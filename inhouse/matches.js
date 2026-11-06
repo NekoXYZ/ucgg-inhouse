@@ -98,30 +98,40 @@ module.exports = {
 				role.push(...mmrData);
 			}
 
-			// function PickBestFill(role, fill) {
-			// 	let best = 0;
-			// 	const names = new Array();
-
-			// 	fill.forEach(obj => {
-			// 		for (const key of Object.entries(obj)) {
-			// 			names.push(key[0]);
-			// 		}
-			// 	});
-
-			// 	for (let i = 1; i < fill.length; i++) {
-
-			// 		if (fill[i][names[i]][role] > fill[best][names[best]][role]) {
-			// 			best = i;
-			// 		}
-			// 	}
-
-			// 	const chosen = fill.splice(best, 1)[0];
-
-			// 	return { [names[best]]: chosen[names[best]][role] };
-			// }
 
 
+			const roles = [...playerMMR.keys()].filter(r => r !== "Fill");
 
+			function getValidTeams() {
+				const splits = [];
+		
+				//loop through a 10 bit unisgned integer, each bit corresponds to the team assignment of one player. 
+				//results in a lot of wasted loops (like 0000000000 puts everyone on team a and then gets discarded) but i still think this is the easiest way to do this
+				for (let lobbyInt = 0; lobbyInt < (1 << lobby.length); lobbyInt++) {
+					const teamA = [];
+					const teamB = [];
+				    
+					//for each player (0-9), get their respective bit by left shifting by their player value
+					lobby.forEach((player, p) => {
+						if (lobbyInt & (1 << p)) { teamA.push(player); }
+						else { teamB.push(player); }
+					});
+		
+					// skip teams of less than 5 
+					if (teamA.length !== roles.length) { continue; }
+		
+					// Skip teams with two players qd for same role
+					const hasRoleClash = [teamA, teamB].some(team => {
+						const lockedRoles = team.map(player => player.lockedRole).filter(role => role !== null);
+						return new Set(lockedRoles).size < lockedRoles.length; 
+					});
+					if (hasRoleClash) { continue; }
+		
+					splits.push({ teamA, teamB });
+				}
+		
+				return splits;
+			}
 			
 
 			// run multiple simulations and pick the best
@@ -149,10 +159,10 @@ module.exports = {
 			}
 
 			//converts from the abstract role asignments back into teams of players
-			function makeTeams(option) {
+			function makeTeams(abstractTeam) {
 				const team = new Collection();
 				for (const role of roles) {
-					const player = option.assignment.get(role);
+					const player = abstractTeam.assignment.get(role);
 					side.set(role, { [player.id]: player.mmr[role] });
 				}
 				return team;
