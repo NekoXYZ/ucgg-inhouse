@@ -137,7 +137,7 @@ module.exports = {
 		
 					// Skip teams with two players qd for same role
 					const hasRoleClash = [teamA, teamB].some(team => {
-						const lockedRoles = team.map(player => player.lockedRole).filter(role => role !== null);
+						const lockedRoles = team.map(player => player.assignedRole).filter(role => role !== null);
 						return new Set(lockedRoles).size < lockedRoles.length; 
 					});
 					if (hasRoleClash) { continue; }
@@ -146,6 +146,39 @@ module.exports = {
 				}
 		
 				return splits;
+			}
+
+
+			//for a given team of 5, return every possible valid role assignemnet for the filled players
+			function getPossibleRoleAssignments(team) {
+				const lockedPart = new Map();//   players with assigned roles
+				const fillPlayers = [];
+				for (const player of team) {
+					if (player.assignedRole === null) {
+						fillPlayers.push(player);
+					}
+					else {
+						lockedPart.set(player.assignedRole, player);
+					}
+				}
+	
+				const freeRoles = roles.filter(r => !lockedPart.has(r)); //call any role not claimed "free"
+		
+				//every way of arranging fill players into free roles. i got AI to write this so idk how it works
+				let orderings = [[]];
+				for (let i = 0; i < fillPlayers.length; i++) {
+					orderings = orderings.flatMap(partial =>
+						freeRoles.filter(role => !partial.includes(role)).map(role => [...partial, role]),
+					);
+				}
+		
+				return orderings.map(ordering => {
+					const assignment = new Map(lockedPart);
+					fillPlayers.forEach((player, i) => assignment.set(ordering[i], player));
+					let total = 0;
+					for (const [role, player] of assignment) { total += player.mmr[role]; }
+					return { total, assignment };
+				});
 			}
 			
 
