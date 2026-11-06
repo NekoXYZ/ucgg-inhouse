@@ -98,10 +98,25 @@ module.exports = {
 				role.push(...mmrData);
 			}
 
-
-
 			const roles = [...playerMMR.keys()].filter(r => r !== "Fill");
 
+			//create the lobby struct convert from list of positions (and whos qing them) to a list of players, each with a role and mmr
+			const lobby = [];
+			for (const [queuedRole, entries] of playerMMR) {
+				for (const entry of entries) {
+					// convert from { [player]: mmr } to {[player,role,mmr]}
+					const [id, value] = Object.entries(entry)[0];
+		
+					if (queuedRole === "Fill") {
+						lobby.push({ id, assignedRole: null, mmr: value });
+					}
+					else {
+						lobby.push({ id, assignedRole: queuedRole, mmr: { [queuedRole]: value } });
+					}
+				}
+			}
+
+			//gets every way to divide the 10 players into two teams, dont care about balance ATP
 			function getValidTeams() {
 				const splits = [];
 		
