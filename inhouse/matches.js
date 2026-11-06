@@ -116,12 +116,17 @@ module.exports = {
 				}
 			}
 
+			//ASSERT(lobby.length==10)
+			if (lobby.length !== 10) {
+				throw new Error(`needs 10 players, got ${lobby.length}`);
+			}
+
 			//gets every way to divide the 10 players into two teams, dont care about balance ATP
 			function getValidTeams() {
 				const splits = [];
 		
 				//loop through a 10 bit unisgned integer, each bit corresponds to the team assignment of one player. 
-				//results in a lot of wasted loops (like 0000000000 puts everyone on team a and then gets discarded) but i still think this is the easiest way to do this
+				//results in a lot of wasted loops (like 0000000000 puts everyone on team b and then gets discarded) but i still think this is the easiest way to do this
 				for (let lobbyInt = 0; lobbyInt < (1 << lobby.length); lobbyInt++) {
 					const teamA = [];
 					const teamB = [];
@@ -132,7 +137,7 @@ module.exports = {
 						else { teamB.push(player); }
 					});
 		
-					// skip teams of less than 5 
+					// skip bad team sizes
 					if (teamA.length !== roles.length) { continue; }
 		
 					// Skip teams with two players qd for same role
@@ -164,7 +169,7 @@ module.exports = {
 	
 				const freeRoles = roles.filter(r => !lockedPart.has(r)); //call any role not claimed "free"
 		
-				//every way of arranging fill players into free roles. i got AI to write this so idk how it works
+				//every way of arranging fill players into free roles. i got AI to rewrite the rest of this function from here so idk how it works but its way shorter than what i had written
 				let orderings = [[]];
 				for (let i = 0; i < fillPlayers.length; i++) {
 					orderings = orderings.flatMap(partial =>
@@ -192,18 +197,21 @@ module.exports = {
 				const allPossibleTeamBs = getPossibleRoleAssignments(teamB);
 
 				//for every possible combination of each team check which has the lowest RELATIVE mmr difference
-				for (const teamA of allPossibleTeamAs) {
-					for (const teamB of allPossibleTeamBs) {
-						const total = teamA.total + teamB.total;
-		
-						// How far apart the two team totals are, in raw MMR points.
-						const relDiff = (Math.abs(teamA.total - teamB.total))/ total;
+				for (const TeamBlue of allPossibleTeamAs) {
+					for (const teamRed of allPossibleTeamBs) {
+						const total = TeamBlue.total + teamRed.total;
+						const relDiff = (Math.abs(TeamBlue.total - teamRed.total))/ total;
 		
 						if (!best || relDiff < best.relDiff) {
-							best = { total, teamA, teamB };
+							best = { relDiff, total, TeamBlue, teamRed };
 						}
 					}
 				}
+			}
+
+			//ASSERT(best!=null)
+			if(!best){
+				throw new Error("no valid matchup")
 			}
 
 			//converts from the abstract role asignments back into teams of players
@@ -211,16 +219,16 @@ module.exports = {
 				const team = new Collection();
 				for (const role of roles) {
 					const player = abstractTeam.assignment.get(role);
-					side.set(role, { [player.id]: player.mmr[role] });
+					team.set(role, { [player.id]: player.mmr[role] });
 				}
 				return team;
 			}
 
 
-			const blueSide = makeTeams(best.a);
-			const redSide = makeTeams(best.b);
-			const totalBlue = best.a.total;
-			const totalRed = best.b.total;
+			const blueSide = makeTeams(best.TeamBlue);
+			const redSide = makeTeams(best.teamRed);
+			const totalBlue = best.TeamBlue.total;
+			const totalRed = best.teamRed.total;
 
 			return {
 				blueSide,
