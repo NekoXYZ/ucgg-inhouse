@@ -78,7 +78,7 @@ module.exports = {
 
 			//Weighting for how much we care about role balance. 
 			// e.g. 0.3 means that a lobby with an RMS role MMR gap of 1000 and perfectly balanced teams is scored the same as a lobby with perfectly balanced roles and a total MMR gap of 300
-			const roleScoreWeighting = 0.2
+			const roleScoreWeighting = 0.4
 
 			const playerMMR = new Collection();
 
