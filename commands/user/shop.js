@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, InteractionContextType, MessageFlags } = require("discord.js");
+const logError = require("../../utility/log-error.js");
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -11,7 +12,7 @@ module.exports = {
 		const client = interaction.client;
 
 		const panel = await client.panels.get("Shop Main")(client, interaction);
-		await interaction.editReply({ components: [panel[1], panel[0]], flags: MessageFlags.IsComponentsV2, files: [panel[2]] }).catch(console.error);
+		await interaction.editReply({ components: [panel[1], panel[0]], flags: MessageFlags.IsComponentsV2, files: [panel[2]] }).catch((error) => logError("Failed to show the shop.", error));
 
 		return;
 	},

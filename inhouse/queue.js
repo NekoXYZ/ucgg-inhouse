@@ -1,4 +1,5 @@
 const { MessageFlags, Collection, ChannelType, time, TimestampStyles, Colors, AttachmentBuilder } = require('discord.js');
+const logError = require("../utility/log-error.js");
 
 module.exports = {
 	run(client) {
@@ -14,28 +15,65 @@ module.exports = {
 
 		const config = client.config;
 
-		const file = new AttachmentBuilder("./img/queue_banner.png");
+		client.latestInhousePost = null;
 
-		// create inhouse post func
+		// Post the queue once, then edit that message when the queue changes.
 		client.RefreshInHousePost = function() {
-			client.inhousePosting = true;
-			client.enqueue(config.inhouse_channel, async () => {
+			return client.enqueue(config.inhouse_channel, async () => {
 				try {
 					const channel = client.channels.cache.get(config.inhouse_channel);
-					if (client.latestInhousePost != null) {
-						await client.latestInhousePost.delete().catch(console.error);
+					if (!channel) {
+						logError("Failed to update the queue because the in-house channel was not found.");
+						return;
 					}
+
 					client.resetInactivityTimer();
-					const msg = await channel.send({
-						components: [client.panels.get("In-House Queue")(client)],
-						files: [file],
+
+					const payload = {
+						components: [await client.panels.get("In-House Queue")(client)],
 						flags: MessageFlags.IsComponentsV2,
 						allowedMentions: { parse: [] },
-					});
-					client.latestInhousePost = msg;
+					};
+
+					if (client.latestInhousePost == null) {
+						const storedId = await client.keyv.get("inhousePostId");
+						if (storedId) {
+							client.latestInhousePost = await channel.messages.fetch(storedId).catch(() => null);
+						}
+					}
+
+					if (client.latestInhousePost == null) {
+						const recent = await channel.messages.fetch({ limit: 50 }).catch(() => null);
+						client.latestInhousePost = recent?.find((message) => message.author.id == client.user.id) ?? null;
+					}
+
+					if (client.latestInhousePost != null) {
+						try {
+							client.latestInhousePost = await client.latestInhousePost.edit(payload);
+							await client.keyv.set("inhousePostId", client.latestInhousePost.id);
+							return;
+						}
+						catch (error) {
+							logError("Failed to edit the queue message.", error);
+							client.latestInhousePost = null;
+							await client.keyv.delete("inhousePostId");
+						}
+					}
+
+					try {
+						const msg = await channel.send({
+							...payload,
+							files: [new AttachmentBuilder("./img/queue_banner.png")],
+						});
+						client.latestInhousePost = msg;
+						await client.keyv.set("inhousePostId", msg.id);
+					}
+					catch (error) {
+						logError("Failed to post the queue message.", error);
+					}
 				}
- 				finally {
-					client.inhousePosting = false;
+				catch (error) {
+					logError("Failed to update the queue message.", error);
 				}
 			});
 		};
@@ -130,12 +168,12 @@ module.exports = {
 					target = await client.users.fetch(userId);
 				}
 				catch (error) {
-					console.error('User not found:', error);
+					logError("Failed to find a player who was removed from the queue for inactivity.", error);
 					return;
 				}
 			}
 
-			target.send(`-# Automated Message:\nYou have been removed from the queue as there has been no queue activity for five hours.`).catch(console.error);
+			target.send(`-# Automated Message:\nYou have been removed from the queue as there has been no queue activity for five hours.`).catch((error) => logError("Failed to send an inactivity removal message.", error));
 			client.LeaveQueue(userId);
 		};
 
@@ -175,6 +213,15 @@ module.exports = {
 
 		// queue pop
 		async function QueuePop() {
+			try {
+				await OpenMatch();
+			}
+			catch (error) {
+				logError("Failed to open a match lobby.", error);
+			}
+		}
+
+		async function OpenMatch() {
 			// consolidate players into a match object
 			const queue = client.queue;
 			const match = new Collection();
@@ -254,15 +301,15 @@ module.exports = {
 				colors: {
 					primaryColor: Colors.Blue,
 				},
-			}).catch(console.error);
+			}).catch((error) => logError("Failed to create the match role.", error));
 
 			match.set("role", role);
 
 			for (let i = 0; i < players.length; i++) {
 				const member = guild.members.cache.get(players[i]) || null;
 
-				if (member == null) { continue; }
-				member.roles.add(role);
+				if (member == null || role == null) { continue; }
+				member.roles.add(role).catch((error) => logError("Failed to give a player the match role.", error));
 			}
 
 			setTimeout(() => client.cancelAfterDelay(matchId), 180 * 1000);

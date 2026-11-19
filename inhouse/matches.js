@@ -1,5 +1,6 @@
 const { Collection, MessageFlags, ChannelType } = require("discord.js");
 const modifiers = require('../modifiers.json');
+const logError = require("../utility/log-error.js");
 
 module.exports = {
 	run(client) {
@@ -14,13 +15,19 @@ module.exports = {
 			if (match.get("begin_lock")) { return; }
 			match.set("begin_lock", true);
 
-			const teams = await BalanceTeams(match);
+			try {
+				const teams = await BalanceTeams(match);
+				if (teams == null) { return; }
 
-			match.set("teams", teams);
+				match.set("teams", teams);
 
-			client.matchChannels.set(match.get("textChannel").id, match);
+				client.matchChannels.set(match.get("textChannel").id, match);
 
-			WheelVote(match);
+				WheelVote(match);
+			}
+			catch (error) {
+				logError("Failed to start the match.", error);
+			}
 		};
 
 		client.cancelMatch = function(number) {
@@ -32,29 +39,29 @@ module.exports = {
 			const textChannel = match.get("textChannel");
 			client.matchChannels.delete(textChannel.id);
 			if (textChannel != null) {
-				textChannel.delete();
+				textChannel.delete().catch((error) => logError("Failed to delete a match text channel.", error));
 			}
 
 			// delete vcs
 			const waitingRoom = match.get("waitingRoom");
 			if (waitingRoom != null) {
-				waitingRoom.delete();
+				waitingRoom.delete().catch((error) => logError("Failed to delete a match waiting room.", error));
 			}
 
 			const blueVc = match.get("blueVc");
 			if (blueVc != null) {
-				blueVc.delete();
+				blueVc.delete().catch((error) => logError("Failed to delete a blue side voice channel.", error));
 			}
 
 			const redVc = match.get("redVc");
 			if (redVc != null) {
-				redVc.delete();
+				redVc.delete().catch((error) => logError("Failed to delete a red side voice channel.", error));
 			}
 
 			// delete role
 			const role = match.get("role");
 			if (role != null) {
-				role.delete();
+				role.delete().catch((error) => logError("Failed to delete a match role.", error));
 			}
 
 			client.matches.delete(number);
@@ -104,13 +111,13 @@ module.exports = {
 
 			const roles = [...playerMMR.keys()].filter(r => r !== "Fill");
 
-			//create the lobby struct convert from list of positions (and whos qing them) to a list of players, each with a role and mmr
+			// create the lobby struct convert from list of positions (and whos qing them) to a list of players, each with a role and mmr
 			const lobby = [];
 			for (const [queuedRole, entries] of playerMMR) {
 				for (const entry of entries) {
 					// convert from { [player]: mmr } to {[player,role,mmr]}
 					const [id, value] = Object.entries(entry)[0];
-		
+
 					if (queuedRole === "Fill") {
 						lobby.push({ id, assignedRole: null, mmr: value });
 					}
@@ -120,45 +127,45 @@ module.exports = {
 				}
 			}
 
-			//ASSERT(lobby.length==10)
 			if (lobby.length !== 10) {
-				throw new Error(`needs 10 players, got ${lobby.length}`);
+				logError("Failed to balance teams because the lobby does not have 10 players.", new Error(`needs 10 players, got ${lobby.length}`));
+				return null;
 			}
 
-			//gets every way to divide the 10 players into two teams, dont care about balance ATP
+			// gets every way to divide the 10 players into two teams, dont care about balance ATP
 			function getValidTeams() {
 				const splits = [];
-		
-				//loop through a 10 bit unisgned integer, each bit corresponds to the team assignment of one player. 
-				//results in a lot of wasted loops (like 0000000000 puts everyone on team b and then gets discarded) but i still think this is the easiest way to do this
+
+				// loop through a 10 bit unisgned integer, each bit corresponds to the team assignment of one player.
+				// results in a lot of wasted loops (like 0000000000 puts everyone on team b and then gets discarded) but i still think this is the easiest way to do this
 				for (let lobbyInt = 0; lobbyInt < (1 << lobby.length); lobbyInt++) {
 					const teamA = [];
 					const teamB = [];
-				    
-					//for each player (0-9), get their respective bit by left shifting by their player value
+
+					// for each player (0-9), get their respective bit by left shifting by their player value
 					lobby.forEach((player, p) => {
 						if (lobbyInt & (1 << p)) { teamA.push(player); }
 						else { teamB.push(player); }
 					});
-		
+
 					// skip bad team sizes
 					if (teamA.length !== roles.length) { continue; }
-		
+
 					// Skip teams with two players qd for same role
 					const hasRoleClash = [teamA, teamB].some(team => {
 						const lockedRoles = team.map(player => player.assignedRole).filter(role => role !== null);
-						return new Set(lockedRoles).size < lockedRoles.length; 
+						return new Set(lockedRoles).size < lockedRoles.length;
 					});
 					if (hasRoleClash) { continue; }
-		
+
 					splits.push({ teamA, teamB });
 				}
-		
+
 				return splits;
 			}
 
 
-			//for a given team of 5, return every possible valid role assignemnet for the filled players
+			// for a given team of 5, return every possible valid role assignemnet for the filled players
 			function getPossibleRoleAssignments(team) {
 				const lockedPart = new Map();//   players with assigned roles
 				const fillPlayers = [];
@@ -170,17 +177,17 @@ module.exports = {
 						lockedPart.set(player.assignedRole, player);
 					}
 				}
-	
-				const freeRoles = roles.filter(r => !lockedPart.has(r)); //call any role not claimed "free"
-		
-				//every way of arranging fill players into free roles. i got AI to rewrite the rest of this function from here so idk how it works but its way shorter than what i had written
+
+				const freeRoles = roles.filter(r => !lockedPart.has(r)); // call any role not claimed "free"
+
+				// every way of arranging fill players into free roles. i got AI to rewrite the rest of this function from here so idk how it works but its way shorter than what i had written
 				let orderings = [[]];
 				for (let i = 0; i < fillPlayers.length; i++) {
 					orderings = orderings.flatMap(partial =>
 						freeRoles.filter(role => !partial.includes(role)).map(role => [...partial, role]),
 					);
 				}
-		
+
 				return orderings.map(ordering => {
 					const assignment = new Map(lockedPart);
 					fillPlayers.forEach((player, i) => assignment.set(ordering[i], player));
@@ -189,7 +196,7 @@ module.exports = {
 					return { total, assignment };
 				});
 			}
-			
+
 
 			// run multiple simulations and pick the best
 			let best = null;
@@ -198,7 +205,7 @@ module.exports = {
 			//for every possible way players can be split between red and blue
 			for (const { teamA, teamB } of getValidTeams()) {
 
-				//get every way players can be arranged within each team
+				// get every way players can be arranged within each team
 				const allPossibleTeamAs = getPossibleRoleAssignments(teamA);
 				const allPossibleTeamBs = getPossibleRoleAssignments(teamB);
 				//for every possible combination of each team check which has the lowest RELATIVE mmr difference
@@ -231,12 +238,12 @@ module.exports = {
 				}
 			}
 
-			//ASSERT(best!=null)
-			if(!best){
-				throw new Error("no valid matchup")
+			if (!best) {
+				logError("Failed to balance teams because no valid matchup was found.", new Error("no valid matchup"));
+				return null;
 			}
 
-			//converts from the abstract role asignments back into teams of players
+			// converts from the abstract role asignments back into teams of players
 			function makeTeams(abstractTeam) {
 				const team = new Collection();
 				for (const role of roles) {
@@ -265,17 +272,22 @@ module.exports = {
 			const key = "wheelVote" + match.get("number");
 
 			client.enqueue(key, async () => {
-				const wheelVoteMessage = match.get("wheelVoteMsg");
+				try {
+					const wheelVoteMessage = match.get("wheelVoteMsg");
 
-				// check if msg is valid
-				const valid = await wheelVoteMessage.channel.messages.fetch(wheelVoteMessage.id);
+					// check if msg is valid
+					const valid = await wheelVoteMessage.channel.messages.fetch(wheelVoteMessage.id);
 
-				if (!valid) { return; }
+					if (!valid) { return; }
 
-				wheelVoteMessage.edit({
-					components: [client.panels.get("Vote Wheel")(client, match)],
-					flags: MessageFlags.IsComponentsV2,
-				}).catch(console.error);
+					await wheelVoteMessage.edit({
+						components: [client.panels.get("Vote Wheel")(client, match)],
+						flags: MessageFlags.IsComponentsV2,
+					});
+				}
+				catch (error) {
+					logError("Failed to refresh the wheel vote.", error);
+				}
 			});
 		};
 
@@ -283,21 +295,26 @@ module.exports = {
 			const key = "modifierVote" + match.get("number");
 
 			client.enqueue(key, async () => {
-				const modifierVoteMessage = match.get("modifierVoteMsg");
+				try {
+					const modifierVoteMessage = match.get("modifierVoteMsg");
 
-				// check if msg is valid
-				const valid = await modifierVoteMessage.channel.messages.fetch(modifierVoteMessage.id);
+					// check if msg is valid
+					const valid = await modifierVoteMessage.channel.messages.fetch(modifierVoteMessage.id);
 
-				if (!valid) { return; }
+					if (!valid) { return; }
 
-				const modifier1 = match.get("modifier1");
-				const modifier2 = match.get("modifier2");
-				const modifier3 = match.get("modifier3");
+					const modifier1 = match.get("modifier1");
+					const modifier2 = match.get("modifier2");
+					const modifier3 = match.get("modifier3");
 
-				modifierVoteMessage.edit({
-					components: [client.panels.get("Modifier Vote")(client, match, modifier1, modifier2, modifier3)],
-					flags: MessageFlags.IsComponentsV2,
-				}).catch(console.error);
+					await modifierVoteMessage.edit({
+						components: [client.panels.get("Modifier Vote")(client, match, modifier1, modifier2, modifier3)],
+						flags: MessageFlags.IsComponentsV2,
+					});
+				}
+				catch (error) {
+					logError("Failed to refresh the modifier vote.", error);
+				}
 			});
 		};
 
@@ -333,7 +350,7 @@ module.exports = {
 			channel.send({
 				components: [client.panels.get("Modifier Vote")(client, match, modifier1, modifier2, modifier3)],
 				flags: MessageFlags.IsComponentsV2,
-			}).then(msg => match.set("modifierVoteMsg", msg));
+			}).then(msg => match.set("modifierVoteMsg", msg)).catch((error) => logError("Failed to post the modifier vote.", error));
 		};
 
 		// wheel vote used to point to this, but now its modifier vote
@@ -341,36 +358,41 @@ module.exports = {
 			if (match.get("modifier_locked")) { return; }
 			match.set("modifier_locked", true);
 
-			const wheelVoteMessage = match.get("wheelVoteMsg");
-			wheelVoteMessage.delete();
+			try {
+				const wheelVoteMessage = match.get("wheelVoteMsg");
+				wheelVoteMessage.delete().catch((error) => logError("Failed to delete the wheel vote.", error));
 
-			const channel = match.get("textChannel");
+				const channel = match.get("textChannel");
 
-			if (result) {
-				const modifierVoteMessage = match.get("modifierVoteMsg");
+				if (result) {
+					const modifierVoteMessage = match.get("modifierVoteMsg");
 
-				modifierVoteMessage.delete();
+					modifierVoteMessage.delete().catch((error) => logError("Failed to delete the modifier vote.", error));
 
-				let string = `The random modifier for this game is: ${modifier.value}`;
+					let string = `The random modifier for this game is: ${modifier.value}`;
 
-				if (modifier.description) {
-					string += `\n${modifier.description}`;
+					if (modifier.description) {
+						string += `\n${modifier.description}`;
+					}
+
+					channel.send(string).catch((error) => logError("Failed to post the wheel result.", error));
+				}
+				else {
+					channel.send("The wheel will not be spun.").catch((error) => logError("Failed to post the wheel result.", error));
 				}
 
-				channel.send(string);
+				MoveToVoice(match);
 			}
-			else {
-				channel.send("The wheel will not be spun.");
+			catch (error) {
+				logError("Failed to finish the wheel vote.", error);
 			}
-
-			MoveToVoice(match);
 		};
 
 		function WheelVote(match) {
 			// cleanup match data
 			const ping = match.get("waitingRoomPing");
 			if (ping != null) {
-				ping.delete();
+				ping.delete().catch((error) => logError("Failed to delete the match ready ping.", error));
 			}
 			match.delete("waitingRoomPing");
 			match.delete("waitingOn");
@@ -384,7 +406,7 @@ module.exports = {
 			channel.send({
 				components: [client.panels.get("Vote Wheel")(client, match)],
 				flags: MessageFlags.IsComponentsV2,
-			}).then(msg => match.set("wheelVoteMsg", msg));
+			}).then(msg => match.set("wheelVoteMsg", msg)).catch((error) => logError("Failed to post the wheel vote.", error));
 		}
 
 		async function MoveToVoice(match) {
@@ -392,73 +414,80 @@ module.exports = {
 			if (match.get("move_locked")) { return; }
 			match.set("move_locked", true);
 
-			// clean up wheel data
-			match.delete("wheelVotesYes");
-			match.delete("wheelVotesNo");
-			match.delete("wheelvote");
-			match.delete("wheelVoteMsg");
-			match.delete("modifierVotes1");
-			match.delete("modifierVotes2");
-			match.delete("modifierVotes3");
+			try {
+				// clean up wheel data
+				match.delete("wheelVotesYes");
+				match.delete("wheelVotesNo");
+				match.delete("wheelvote");
+				match.delete("wheelVoteMsg");
+				match.delete("modifierVotes1");
+				match.delete("modifierVotes2");
+				match.delete("modifierVotes3");
 
-			// vote for wheel spin.
-			match.set("winnerVotesBlue", new Array());
-			match.set("winnerVotesRed", new Array());
+				// vote for wheel spin.
+				match.set("winnerVotesBlue", new Array());
+				match.set("winnerVotesRed", new Array());
 
-			const channel = match.get("textChannel");
+				const channel = match.get("textChannel");
 
-			channel.send({
-				components: [client.panels.get("Teams and Vote Winner")(client, match)],
-				flags: MessageFlags.IsComponentsV2,
-				allowedMentions: { parse: [] },
-			}).then(msg => {
-				match.set("winnerVoteMsg", msg);
-				match.set("votePosting", false);
-			});
+				channel.send({
+					components: [client.panels.get("Teams and Vote Winner")(client, match)],
+					flags: MessageFlags.IsComponentsV2,
+					allowedMentions: { parse: [] },
+				}).then(msg => {
+					match.set("winnerVoteMsg", msg);
+					match.set("votePosting", false);
+				}).catch((error) => logError("Failed to post the winner vote.", error));
 
-			// create team a and team b vc
-			const category = client.channels.cache.get(config.inhouse_category);
-			const guild = category.guild;
+				// create team a and team b vc
+				const category = client.channels.cache.get(config.inhouse_category);
+				const guild = category.guild;
 
-			const blueVc = await guild.channels.create({
-				name: `Match #${match.get("number")} - Blue Side`,
-				type: ChannelType.GuildVoice,
-				parent: category,
-			});
-			match.set("blueVc", blueVc);
+				const blueVc = await guild.channels.create({
+					name: `Match #${match.get("number")} - Blue Side`,
+					type: ChannelType.GuildVoice,
+					parent: category,
+				});
+				match.set("blueVc", blueVc);
 
-			const redVc = await guild.channels.create({
-				name: `Match #${match.get("number")} - Red Side`,
-				type: ChannelType.GuildVoice,
-				parent: category,
-			});
-			match.set("redVc", redVc);
+				const redVc = await guild.channels.create({
+					name: `Match #${match.get("number")} - Red Side`,
+					type: ChannelType.GuildVoice,
+					parent: category,
+				});
+				match.set("redVc", redVc);
 
-			// move people into there
-			const teams = match.get("teams");
+				// move people into there
+				const teams = match.get("teams");
 
-			for (const [, player] of teams.blueSide) {
-				const id = Object.keys(player)[0];
-				const member = guild.members.cache.get(id) || null;
+				for (const [, player] of teams.blueSide) {
+					const id = Object.keys(player)[0];
+					const member = guild.members.cache.get(id) || null;
 
-				if (member == null) { continue; }
+					if (member == null) { continue; }
 
-				member.voice.setChannel(blueVc).catch(console.error);
+					member.voice.setChannel(blueVc).catch((error) => logError("Failed to move a player into the blue side voice channel.", error));
+				}
+
+				for (const [, player] of teams.redSide) {
+					const id = Object.keys(player)[0];
+					const member = guild.members.cache.get(id) || null;
+
+					if (member == null) { continue; }
+
+					member.voice.setChannel(redVc).catch((error) => logError("Failed to move a player into the red side voice channel.", error));
+				}
+
+				// delete waiting room
+				const waitingRoom = match.get("waitingRoom");
+				setTimeout(() => {
+					waitingRoom.delete().catch((error) => logError("Failed to delete the match waiting room.", error));
+				}, 10000);
+				match.delete("waitingRoom");
 			}
-
-			for (const [, player] of teams.redSide) {
-				const id = Object.keys(player)[0];
-				const member = guild.members.cache.get(id) || null;
-
-				if (member == null) { continue; }
-
-				member.voice.setChannel(redVc).catch(console.error);
+			catch (error) {
+				logError("Failed to move the match into team voice channels.", error);
 			}
-
-			// delete waiting room
-			const waitingRoom = match.get("waitingRoom");
-			setTimeout(async () => waitingRoom.delete(), 10000);
-			match.delete("waitingRoom");
 		}
 
 		client.setWinner = async function(number, result) {
@@ -481,17 +510,24 @@ module.exports = {
 			// post results
 			const channel = client.channels.cache.get(config.results_channel);
 
-			channel.send({
-				components: [client.panels.get("Results")(client.config, match, result)],
-				flags: MessageFlags.IsComponentsV2,
-				allowedMentions: { parse: [] },
-			});
+			if (channel == null) {
+				logError("Failed to post the match results because the results channel was not found.");
+			}
+			else {
+				channel.send({
+					components: [client.panels.get("Results")(client.config, match, result)],
+					flags: MessageFlags.IsComponentsV2,
+					allowedMentions: { parse: [] },
+				}).catch((error) => logError("Failed to post the match results.", error));
+			}
 
 			// delete vc and text and other data
 			match.delete("positions");
 			const textChannel = match.get("textChannel");
-			client.matchChannels.delete(textChannel.id);
-			textChannel.delete();
+			if (textChannel != null) {
+				client.matchChannels.delete(textChannel.id);
+				textChannel.delete().catch((error) => logError("Failed to delete the match text channel.", error));
+			}
 
 			match.delete("textChannel");
 			match.delete("winnerVotesBlue");
@@ -499,16 +535,22 @@ module.exports = {
 			match.delete("winnervote");
 
 			const blueVc = match.get("blueVc");
-			blueVc.delete();
+			if (blueVc != null) {
+				blueVc.delete().catch((error) => logError("Failed to delete the blue side voice channel.", error));
+			}
 			match.delete("blueVc");
 
 			const redVc = match.get("redVc");
-			redVc.delete();
+			if (redVc != null) {
+				redVc.delete().catch((error) => logError("Failed to delete the red side voice channel.", error));
+			}
 			match.delete("redVc");
 
 			// delete role
 			const dsRole = match.get("role");
-			dsRole.delete();
+			if (dsRole != null) {
+				dsRole.delete().catch((error) => logError("Failed to delete the match role.", error));
+			}
 			match.delete("role");
 
 			match.delete("winnerVoteMsg");
@@ -524,30 +566,35 @@ module.exports = {
 			const day = new Date().getDay();
 			if (day == 6 || day == 0) { creditBoost = true; }
 
-			// winner
-			for (const [role, player] of winner) {
-				const [id] = Object.entries(player)[0];
-				const data = await client.LoadPlayer(id);
+			try {
+				// winner
+				for (const [role, player] of winner) {
+					const [id] = Object.entries(player)[0];
+					const data = await client.LoadPlayer(id);
 
-				data["wins"]++;
-				data["points"] += creditBoost ? config.points_win * 3 : config.points_win;
-				data["mmrs"][role] += config.mmr_gain;
+					data["wins"]++;
+					data["points"] += creditBoost ? config.points_win * 3 : config.points_win;
+					data["mmrs"][role] += config.mmr_gain;
 
-				await client.SavePlayer(id, data);
+					await client.SavePlayer(id, data);
+				}
+
+				// loser
+				for (const [role, player] of loser) {
+					const [id] = Object.entries(player)[0];
+					const data = await client.LoadPlayer(id);
+
+					data["losses"]++;
+					data["points"] += creditBoost ? config.points_loss * 3 : config.points_loss;
+					data["mmrs"][role] -= config.mmr_loss;
+
+					data["mmrs"][role] = Math.max(0, data["mmrs"][role]);
+
+					await client.SavePlayer(id, data);
+				}
 			}
-
-			// loser
-			for (const [role, player] of loser) {
-				const [id] = Object.entries(player)[0];
-				const data = await client.LoadPlayer(id);
-
-				data["losses"]++;
-				data["points"] += creditBoost ? config.points_loss * 3 : config.points_loss;
-				data["mmrs"][role] -= config.mmr_loss;
-
-				data["mmrs"][role] = Math.max(0, data["mmrs"][role]);
-
-				await client.SavePlayer(id, data);
+			catch (error) {
+				logError("Failed to record the match result.", error);
 			}
 
 			client.matches.delete(number);
@@ -562,23 +609,28 @@ module.exports = {
 
 			match.set("votePosting", true);
 			client.enqueue(key, async () => {
-				const winnerVoteMessage = match.get("winnerVoteMsg");
+				try {
+					const winnerVoteMessage = match.get("winnerVoteMsg");
 
-				// check if msg is valid
-				const valid = await winnerVoteMessage.channel.messages.fetch(winnerVoteMessage.id);
+					// check if msg is valid
+					const valid = await winnerVoteMessage.channel.messages.fetch(winnerVoteMessage.id);
 
-				if (!valid) { return; }
+					if (!valid) { return; }
 
-				await winnerVoteMessage.delete();
+					await winnerVoteMessage.delete();
 
-				channel.send({
-					components: [client.panels.get("Teams and Vote Winner")(client, match)],
-					flags: MessageFlags.IsComponentsV2,
-					allowedMentions: { parse: [] },
-				}).then(msg => {
+					const msg = await channel.send({
+						components: [client.panels.get("Teams and Vote Winner")(client, match)],
+						flags: MessageFlags.IsComponentsV2,
+						allowedMentions: { parse: [] },
+					});
 					match.set("winnerVoteMsg", msg);
 					match.set("votePosting", false);
-				});
+				}
+				catch (error) {
+					match.set("votePosting", false);
+					logError("Failed to refresh the winner vote.", error);
+				}
 			});
 		};
 	},

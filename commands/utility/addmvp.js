@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, PermissionFlagsBits, InteractionContextType } = require("discord.js");
+const logError = require("../../utility/log-error.js");
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -22,7 +23,7 @@ module.exports = {
 
 		await interaction.editReply({
 			content: `<@${target.id}> has been given a MVP award!`,
-		}).catch(console.error);
+		}).catch((error) => logError("Failed to confirm that the MVP was given.", error));
 		return;
 	},
 };

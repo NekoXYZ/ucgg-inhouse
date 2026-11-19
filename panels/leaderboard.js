@@ -1,13 +1,19 @@
 const { AttachmentBuilder, ContainerBuilder, ButtonStyle, ButtonBuilder, MediaGalleryBuilder, MessageFlags } = require("discord.js");
 const Canvas = require('@napi-rs/canvas');
 const { request } = require('undici');
+const logError = require("../utility/log-error.js");
 
 let background, slot;
 (async () => {
-	[background, slot] = await Promise.all([
-		Canvas.loadImage('./img/leaderboard.png'),
-		Canvas.loadImage('./img/leaderboard_slot.png'),
-	]);
+	try {
+		[background, slot] = await Promise.all([
+			Canvas.loadImage('./img/leaderboard.png'),
+			Canvas.loadImage('./img/leaderboard_slot.png'),
+		]);
+	}
+	catch (error) {
+		logError("Failed to load the leaderboard images.", error);
+	}
 })();
 
 

@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, PermissionFlagsBits, InteractionContextType, ContainerBuilder, MessageFlags, TextDisplayBuilder } = require("discord.js");
+const logError = require("../../utility/log-error.js");
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -14,30 +15,38 @@ module.exports = {
 		const channel = interaction.options.getChannel("channel");
 		const colour = interaction.options.getNumber("col");
 
-		if (!attachment.contentType?.startsWith("text/")) { await interaction.reply(`Please don't use this command if you don't know what you are doing.`).catch(console.error); return; }
+		if (!attachment.contentType?.startsWith("text/")) { await interaction.reply(`Please don't use this command if you don't know what you are doing.`).catch((error) => logError("Failed to reject an invalid message file.", error)); return; }
 
-		const response = await fetch(attachment.url);
-		const msg = await response.text();
+		try {
+			const response = await fetch(attachment.url);
+			const msg = await response.text();
 
-		await interaction.reply(`<@${interaction.member.id}> has sent a message to <#${channel.id}>`).catch(console.error);
+			await interaction.reply(`<@${interaction.member.id}> has sent a message to <#${channel.id}>`).catch((error) => logError("Failed to confirm that the message was sent.", error));
 
-		let container;
+			let container;
 
-		if (colour) {
-			container = new ContainerBuilder()
-				.setAccentColor(colour)
-				.addTextDisplayComponents((textDisplay) =>
-					textDisplay.setContent(msg),
-				);
+			if (colour) {
+				container = new ContainerBuilder()
+					.setAccentColor(colour)
+					.addTextDisplayComponents((textDisplay) =>
+						textDisplay.setContent(msg),
+					);
+			}
+			else {
+				container = new TextDisplayBuilder().setContent(msg);
+			}
+
+			await channel.send({
+				components: [container],
+				flags: MessageFlags.IsComponentsV2,
+			});
 		}
-		else {
-			container = new TextDisplayBuilder().setContent(msg);
+		catch (error) {
+			logError("Failed to send the custom message.", error);
+			if (!interaction.replied && !interaction.deferred) {
+				await interaction.reply("There was an error while executing this command!").catch((replyError) => logError("Failed to tell the user that the message could not be sent.", replyError));
+			}
 		}
-
-		await channel.send({
-			components: [container],
-			flags: MessageFlags.IsComponentsV2,
-		});
 
 		return;
 	},

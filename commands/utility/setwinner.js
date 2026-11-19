@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, PermissionFlagsBits, InteractionContextType, MessageFlags } = require("discord.js");
+const logError = require("../../utility/log-error.js");
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -31,13 +32,13 @@ module.exports = {
 			await interaction.editReply({
 				content: `Match #${number} does not exist!`,
 				flags: MessageFlags.Ephemeral,
-			}).catch(console.error);
+			}).catch((error) => logError("Failed to tell the user that match does not exist.", error));
 			return;
 
 		case 1:
 			await interaction.client.channels.cache.get(results_channel).send({
 				content: `${interaction.user.username} has set the match #${number}'s winner to ${winner}.`,
-			}).catch(console.error);
+			}).catch((error) => logError("Failed to post who set the match winner.", error));
 			return;
 		}
 	},

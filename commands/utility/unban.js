@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, PermissionFlagsBits, InteractionContextType } = require("discord.js");
+const logError = require("../../utility/log-error.js");
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -23,13 +24,13 @@ module.exports = {
 
 			await interaction.editReply({
 				content: `<@${target.id}> has been unbanned.`,
-			}).catch(console.error);
+			}).catch((error) => logError("Failed to confirm that the player was unbanned.", error));
 			return;
 		}
 		else {
 			await interaction.editReply({
 				content: `<@${target.id}> is not banned.`,
-			}).catch(console.error);
+			}).catch((error) => logError("Failed to tell the user that player is not banned.", error));
 			return;
 		}
 	},

@@ -1,12 +1,18 @@
 const { AttachmentBuilder, ContainerBuilder, ButtonStyle, ButtonBuilder, MediaGalleryBuilder, MessageFlags } = require("discord.js");
 const Canvas = require('@napi-rs/canvas');
+const logError = require("../utility/log-error.js");
 
 let background, slot;
 (async () => {
-	[background, slot] = await Promise.all([
-		Canvas.loadImage('./img/category_shop.png'),
-		Canvas.loadImage('./img/category_shop_slot.png'),
-	]);
+	try {
+		[background, slot] = await Promise.all([
+			Canvas.loadImage('./img/category_shop.png'),
+			Canvas.loadImage('./img/category_shop_slot.png'),
+		]);
+	}
+	catch (error) {
+		logError("Failed to load the category shop images.", error);
+	}
 })();
 
 module.exports = {
@@ -30,13 +36,13 @@ module.exports = {
 
 					// check if they have it
 					if (inventory[category].includes(name)) {
-						await int.editReply("You already own this item!").catch(console.error);
+						await int.editReply("You already own this item!").catch((error) => logError("Failed to tell the user they already own that item.", error));
 						return;
 					}
 
 					// check if they have enough credits
 					if (data.points < item.cost) {
-						await int.editReply("You do not have enough credits to buy this item!").catch(console.error);
+						await int.editReply("You do not have enough credits to buy this item!").catch((error) => logError("Failed to tell the user they cannot afford that item.", error));
 						return;
 					}
 
@@ -46,7 +52,7 @@ module.exports = {
 					await client.SavePlayer(id, data);
 					await client.SaveInventory(id, inventory);
 
-					await int.editReply(`You have purchased ${name} for ${item.cost} credits!`).catch(console.error);
+					await int.editReply(`You have purchased ${name} for ${item.cost} credits!`).catch((error) => logError("Failed to confirm the shop purchase.", error));
 				}
 
 				client.buttons.set(buttonName, Button);
@@ -63,7 +69,7 @@ module.exports = {
 				instance.pageNumber--;
 
 				const panel = await client.panels.get("Category Shop")(client, instance.category, instance.content, instance.pageNumber, interaction);
-				await int.editReply({ components: [panel[1], panel[0]], flags: MessageFlags.IsComponentsV2, files: [panel[2]] }).catch(console.error);
+				await int.editReply({ components: [panel[1], panel[0]], flags: MessageFlags.IsComponentsV2, files: [panel[2]] }).catch((error) => logError("Failed to show the previous shop page.", error));
 			}
 
 			client.buttons.set("categoryshop_nextPage", NextPage);
@@ -77,7 +83,7 @@ module.exports = {
 				instance.pageNumber++;
 
 				const panel = await client.panels.get("Category Shop")(client, instance.category, instance.content, instance.pageNumber, interaction);
-				await int.editReply({ components: [panel[1], panel[0]], flags: MessageFlags.IsComponentsV2, files: [panel[2]] }).catch(console.error);
+				await int.editReply({ components: [panel[1], panel[0]], flags: MessageFlags.IsComponentsV2, files: [panel[2]] }).catch((error) => logError("Failed to show the next shop page.", error));
 			}
 		}
 		setupButtons();

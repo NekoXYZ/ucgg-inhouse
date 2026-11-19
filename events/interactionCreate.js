@@ -1,4 +1,5 @@
 const { Events, MessageFlags, Collection } = require('discord.js');
+const logError = require("../utility/log-error.js");
 
 module.exports = {
 	name: Events.InteractionCreate,
@@ -35,7 +36,7 @@ module.exports = {
 			setTimeout(() => timestamps.delete(interaction.user.id), cooldownAmount);
 
 			if (!command) {
-				console.error(`No command matching ${interaction.commandName} was found.`);
+				logError(`No command matching ${interaction.commandName} was found.`);
 				return;
 			}
 
@@ -43,18 +44,18 @@ module.exports = {
 				await command.execute(interaction);
 			}
 			catch (error) {
-				console.error(error);
+				logError(`Failed to run the /${interaction.commandName} command.`, error);
 				if (interaction.replied || interaction.deferred) {
 					await interaction.followUp({
 						content: 'There was an error while executing this command!',
 						flags: MessageFlags.Ephemeral,
-					});
+					}).catch((replyError) => logError("Failed to tell the user that the command failed.", replyError));
 				}
 				else {
 					await interaction.reply({
 						content: 'There was an error while executing this command!',
 						flags: MessageFlags.Ephemeral,
-					});
+					}).catch((replyError) => logError("Failed to tell the user that the command failed.", replyError));
 				}
 			}
 		}
@@ -62,7 +63,7 @@ module.exports = {
 			const button = interaction.client.buttons.get(interaction.customId);
 
 			if (!button) {
-				console.error(`No button matching ${interaction.customId} was found.`);
+				logError(`No button matching ${interaction.customId} was found.`);
 				return;
 			}
 
@@ -70,18 +71,18 @@ module.exports = {
 				await button(interaction);
 			}
 			catch (error) {
-				console.error(error);
+				logError(`Failed to handle the ${interaction.customId} button.`, error);
 				if (interaction.replied || interaction.deferred) {
 					await interaction.followUp({
 						content: 'There was an error while using this button!',
 						flags: MessageFlags.Ephemeral,
-					}).catch(console.error);
+					}).catch((replyError) => logError("Failed to tell the user that the button failed.", replyError));
 				}
 				else {
 					await interaction.reply({
 						content: 'There was an error while using this button!',
 						flags: MessageFlags.Ephemeral,
-					}).catch(console.error);
+					}).catch((replyError) => logError("Failed to tell the user that the button failed.", replyError));
 				}
 			}
 		}

@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, PermissionFlagsBits, InteractionContextType } = require("discord.js");
+const logError = require("../../utility/log-error.js");
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -12,11 +13,11 @@ module.exports = {
 		const attachment = interaction.options.getAttachment("attachment");
 		const channel = interaction.options.getChannel("channel");
 
-		await interaction.reply(`<@${interaction.member.id}> has sent an attachment to <#${channel.id}>`).catch(console.error);
+		await interaction.reply(`<@${interaction.member.id}> has sent an attachment to <#${channel.id}>`).catch((error) => logError("Failed to confirm that the attachment was sent.", error));
 
 		await channel.send({
 			files: [attachment],
-		});
+		}).catch((error) => logError("Failed to send the attachment.", error));
 
 		return;
 	},

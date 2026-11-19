@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, InteractionContextType, MessageFlags, AttachmentBuilder } = require("discord.js");
+const logError = require("../../utility/log-error.js");
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -17,6 +18,6 @@ module.exports = {
 		const file = new AttachmentBuilder("./img/inventory_banner.png");
 		const panel = client.panels.get("Inventory")(client, target.displayName, inventory);
 
-		await interaction.editReply({ components: [panel], files: [file], flags: MessageFlags.IsComponentsV2 }).catch(console.error); return;
+		await interaction.editReply({ components: [panel], files: [file], flags: MessageFlags.IsComponentsV2 }).catch((error) => logError("Failed to show that inventory.", error)); return;
 	},
 };

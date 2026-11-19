@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, PermissionFlagsBits, InteractionContextType, MessageFlags } = require("discord.js");
+const logError = require("../../utility/log-error.js");
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -46,7 +47,7 @@ module.exports = {
 		await interaction.editReply({
 			content: `<@${target.id}>'s MMR for: ${role} has been set to ${mmr}.`,
 			flags: MessageFlags.Ephemeral,
-		}).catch(console.error);
+		}).catch((error) => logError("Failed to confirm that the MMR was set.", error));
 		return;
 	},
 };

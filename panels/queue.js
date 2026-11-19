@@ -1,8 +1,47 @@
 const { ContainerBuilder, ButtonStyle, ButtonBuilder, Collection, MessageFlags } = require("discord.js");
 
+const ROLES = ["Top", "Jungle", "Mid", "Bot", "Support"];
+const RANK_BANDS = [
+	{ name: "Iron", min: 0, max: 399 },
+	{ name: "Bronze", min: 400, max: 799 },
+	{ name: "Silver", min: 800, max: 1199 },
+	{ name: "Gold", min: 1200, max: 1599 },
+	{ name: "Platinum", min: 1600, max: 1999 },
+	{ name: "Emerald", min: 2000, max: 2399 },
+	{ name: "Diamond", min: 2400, max: 2799 },
+	{ name: "Master", min: 2800, max: 3099 },
+	{ name: "Grandmaster", min: 3100, max: 3299 },
+	{ name: "Challenger", min: 3300, max: Infinity },
+];
+const DIVISION_NUMERALS = ["IV", "III", "II", "I"];
+
+function mmrToRank(mmr) {
+	const value = Math.max(0, Math.round(mmr));
+
+	for (const band of RANK_BANDS) {
+		if (value < band.min || value > band.max) { continue; }
+		if (band.min >= 2800) { return band.name; }
+
+		const division = Math.min(3, Math.floor((value - band.min) / 100));
+		return `${band.name} ${DIVISION_NUMERALS[division]}`;
+	}
+
+	return "Challenger";
+}
+
+async function playerQueueMmr(client, userId, role) {
+	const data = await client.LoadPlayer(userId);
+	if (role != "Fill") { return data.mmrs[role]; }
+
+	const values = ROLES.map((roleName) => data.mmrs[roleName]).filter((mmr) => mmr > 0);
+	if (values.length == 0) { return 0; }
+
+	return values.reduce((sum, mmr) => sum + mmr, 0) / values.length;
+}
+
 module.exports = {
 	name: "In-House Queue",
-	getContainer(client) {
+	async getContainer(client) {
 		const queue = client.queue;
 
 		async function setupButtons() {
@@ -90,6 +129,7 @@ module.exports = {
 		const rolePlayerCount = new Collection();
 
 		let playerCount = 0;
+		const mmrPromises = [];
 
 		for (const key of queue.keys()) {
 			const roleQueue = queue.get(key);
@@ -98,11 +138,21 @@ module.exports = {
 			roleQueue.forEach(id => {
 				_string += "<@" + id + "> ";
 				playerCount++;
+				mmrPromises.push(playerQueueMmr(client, id, key));
 			});
 
 			rolePlayers.set(key, _string);
 			rolePlayerCount.set(key, roleQueue.length);
 		}
+
+		let rankLabel = "Unranked";
+		if (playerCount > 0) {
+			const mmrs = await Promise.all(mmrPromises);
+			const average = mmrs.reduce((sum, mmr) => sum + mmr, 0) / mmrs.length;
+			rankLabel = mmrToRank(average);
+		}
+
+		const playerWord = playerCount == 1 ? "player" : "players";
 
 		// panels
 		const container = new ContainerBuilder()
@@ -113,7 +163,7 @@ module.exports = {
 				),
 			)
 			.addTextDisplayComponents((textDisplay) =>
-				textDisplay.setContent(`-# ${playerCount} players in queue`),
+				textDisplay.setContent(`-# ${playerCount} ${playerWord} in queue | ${rankLabel} average rank`),
 			)
 			.addSeparatorComponents((separator) => separator)
 			// top lane

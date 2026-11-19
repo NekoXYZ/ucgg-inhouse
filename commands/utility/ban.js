@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, PermissionFlagsBits, InteractionContextType } = require("discord.js");
+const logError = require("../../utility/log-error.js");
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -31,7 +32,7 @@ module.exports = {
 
 		await interaction.editReply({
 			content: `<@${target.id}> has been banned from the queue${time == -67 ? "." : ` for ${time} seconds.`}`,
-		}).catch(console.error);
+		}).catch((error) => logError("Failed to confirm that the player was banned.", error));
 		return;
 	},
 };

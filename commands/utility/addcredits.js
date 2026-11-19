@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, PermissionFlagsBits, InteractionContextType } = require("discord.js");
+const logError = require("../../utility/log-error.js");
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -24,7 +25,7 @@ module.exports = {
 
 		await interaction.editReply({
 			content: `<@${target.id}> has been given ${credits} credits!`,
-		}).catch(console.error);
+		}).catch((error) => logError("Failed to confirm that the credits were given.", error));
 		return;
 	},
 };

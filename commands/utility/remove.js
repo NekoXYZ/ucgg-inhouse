@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, PermissionFlagsBits, InteractionContextType, MessageFlags } = require("discord.js");
+const logError = require("../../utility/log-error.js");
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -21,14 +22,14 @@ module.exports = {
 			await interaction.editReply({
 				content: `<@${target.id}> has been removed from the queue.`,
 				flags: MessageFlags.Ephemeral,
-			}).catch(console.error).then(client.RefreshInHousePost());
+			}).catch((error) => logError("Failed to confirm that the player was removed from the queue.", error)).then(client.RefreshInHousePost());
 			return;
 
 		case 1:
 			await interaction.editReply({
 				content: `<@${target.id}> is not in the queue.`,
 				flags: MessageFlags.Ephemeral,
-			}).catch(console.error);
+			}).catch((error) => logError("Failed to tell the user that player is not in the queue.", error));
 			return;
 		}
 	},

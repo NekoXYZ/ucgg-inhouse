@@ -1,8 +1,10 @@
 const { Events, time, TimestampStyles } = require("discord.js");
+const logError = require("../utility/log-error.js");
 
 module.exports = {
 	name: Events.VoiceStateUpdate,
 	execute(_, newState) {
+		if (newState.member == null) { return; }
 		const client = newState.client;
 		const person = newState.member.id;
 
@@ -45,7 +47,7 @@ module.exports = {
 
 			if (!valid) { return; }
 
-			waitingRoomPing.edit(pingString).catch(console.error);
+			waitingRoomPing.edit(pingString).catch((error) => logError("Failed to update the match waiting-room ping.", error));
 
 			if (waitingOn.length == client.config.waiting_on) { client.BeginMatch(match); }
 		});

@@ -82,6 +82,7 @@ client.enqueue = function(key, task) {
 	const prev = client.spamQueue.get(key) || Promise.resolve();
 	const next = prev.finally(() => task());
 	client.spamQueue.set(key, next);
+	return next;
 };
 
 // handle leaderboard instances

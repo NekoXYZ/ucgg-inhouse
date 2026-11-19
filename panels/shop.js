@@ -1,13 +1,19 @@
 const { AttachmentBuilder, ContainerBuilder, ButtonStyle, ButtonBuilder, MediaGalleryBuilder, MessageFlags } = require("discord.js");
 const shopItems = require('../shop.js');
 const Canvas = require('@napi-rs/canvas');
+const logError = require("../utility/log-error.js");
 
 let background, slot;
 (async () => {
-	[background, slot] = await Promise.all([
-		Canvas.loadImage('./img/shop.png'),
-		Canvas.loadImage('./img/shop_slot.png'),
-	]);
+	try {
+		[background, slot] = await Promise.all([
+			Canvas.loadImage('./img/shop.png'),
+			Canvas.loadImage('./img/shop_slot.png'),
+		]);
+	}
+	catch (error) {
+		logError("Failed to load the shop images.", error);
+	}
 })();
 
 // setup shop pages
@@ -52,7 +58,12 @@ module.exports = {
 						await int.deferReply({ flags: MessageFlags.Ephemeral });
 
 						const panel = await client.panels.get("Category Shop")(client, k, pagedShop[k], 0, int);
-						const msg = await int.editReply({ components: [panel[1], panel[0]], flags: MessageFlags.IsComponentsV2, files: [panel[2]] }).catch(console.error);
+						const msg = await int.editReply({ components: [panel[1], panel[0]], flags: MessageFlags.IsComponentsV2, files: [panel[2]] }).catch((error) => {
+							logError("Failed to open a shop category.", error);
+							return null;
+						});
+
+						if (msg == null) { return; }
 
 						client.shops.set(msg.id, {
 							category: k,

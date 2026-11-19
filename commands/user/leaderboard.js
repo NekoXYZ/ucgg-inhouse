@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, InteractionContextType, MessageFlags } = require("discord.js");
+const logError = require("../../utility/log-error.js");
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -127,7 +128,9 @@ module.exports = {
 		const statList = { label: label, maxPages: maxPages, pages: pages, mmr: mmr, key: key, average: average, winrate: winrate };
 
 		const panel = await client.panels.get("Leaderboard")(client, statList, pageNum, interaction);
-		const board = await interaction.editReply({ components: [panel[1], panel[0]], flags: MessageFlags.IsComponentsV2, files: [panel[2]] }).catch(console.error);
+		const board = await interaction.editReply({ components: [panel[1], panel[0]], flags: MessageFlags.IsComponentsV2, files: [panel[2]] }).catch((error) => logError("Failed to show the leaderboard.", error));
+
+		if (board == null) { return; }
 
 		client.leaderboards.set(board.id, { num: pageNum, stat: stat });
 		client.leaderboardsStats.set(board.id, statList);

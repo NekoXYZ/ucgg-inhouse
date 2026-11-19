@@ -1,6 +1,7 @@
 const { SlashCommandBuilder, InteractionContextType } = require("discord.js");
 const { Collection } = require('discord.js');
 const shopItems = require('../../shop.js');
+const logError = require("../../utility/log-error.js");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -41,8 +42,16 @@ module.exports = {
 
 		const profile = profiles.get(shopItems.profiles[inventory.equipped_profile].value + ".js");
 
-		const attachment = await profile.create(target, data);
+		let attachment;
+		try {
+			attachment = await profile.create(target, data);
+		}
+		catch (error) {
+			logError("Failed to render that player's profile.", error);
+			await interaction.editReply({ content: "There was an error while executing this command!" }).catch((replyError) => logError("Failed to tell the user that the profile could not be rendered.", replyError));
+			return;
+		}
 
-		await interaction.editReply({ files: [attachment] }).catch(console.error); return;
+		await interaction.editReply({ files: [attachment] }).catch((error) => logError("Failed to show that player's stats.", error)); return;
 	},
 };

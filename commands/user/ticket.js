@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, InteractionContextType } = require("discord.js");
+const logError = require("../../utility/log-error.js");
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -25,7 +26,7 @@ module.exports = {
 		const inventory = await client.LoadInventory(id);
 
 		if (!inventory["tickets"].includes(item)) {
-			await interaction.editReply(`You do not own a ${item} ticket.`).catch(console.error); return;
+			await interaction.editReply(`You do not own a ${item} ticket.`).catch((error) => logError("Failed to tell the user they do not own that ticket.", error)); return;
 		}
 
 		inventory["tickets"] = inventory["tickets"].filter(e => e !== item);
@@ -43,6 +44,6 @@ module.exports = {
 			break;
 		}
 
-		await interaction.editReply(message).catch(console.error); return;
+		await interaction.editReply(message).catch((error) => logError("Failed to post the used ticket.", error)); return;
 	},
 };
