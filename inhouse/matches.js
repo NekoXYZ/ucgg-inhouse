@@ -193,6 +193,7 @@ module.exports = {
 
 			// run multiple simulations and pick the best
 			let best = null;
+			//number of ties (teams with same score) so that if we have a multi way tie we dont just take the first result
 			let numTies = 1;
 			//for every possible way players can be split between red and blue
 			for (const { teamA, teamB } of getValidTeams()) {
@@ -205,9 +206,15 @@ module.exports = {
 					for (const teamRed of allPossibleTeamBs) {
 						const total = TeamBlue.total + teamRed.total;
 						const relDiff = (Math.abs(TeamBlue.total - teamRed.total))/ total;
+						//RMS (root mean squares) because big diff (pethy vs mcloven in midlane esque situation) is much more impactful than several small gaps
+						//divided by the lobby total so it is a fraction on the same scale as relDiff
+						let sumRoleDiffSquared = 0;
+						for (const role of roles) {
+							const gap = TeamBlue.assignment.get(role).mmr[role] - teamRed.assignment.get(role).mmr[role];
+							sumRoleDiffSquared += gap**2;
+						}
+						const roleDiffRMS = Math.sqrt(sumRoleDiffSquared / roles.length) / total;
 						const score = relDiff + roleDiffRMS*roleScoreWeighting;
-						//number of ties (teams with same score) so that if we have a multi way tie we dont just take the first result
-						
 						//if we dont have a best fit, we beat our best fit, or we tie in score but this results in higher average MMR (better role assignments)
 						if (!best || score < best.score || (score == best.score && total > best.total)) {
 							best = { relDiff, total, TeamBlue, teamRed, score };
