@@ -76,6 +76,10 @@ module.exports = {
 
 			const players = match.get("positions");
 
+			//Weighting for how much we care about role balance. 
+			// e.g. 0.3 means that a lobby with an RMS role MMR gap of 1000 and perfectly balanced teams is scored the same as a lobby with perfectly balanced roles and a total MMR gap of 300
+			const roleScoreWeighting = 0.2
+
 			const playerMMR = new Collection();
 
 			// assign mmrs
@@ -189,21 +193,32 @@ module.exports = {
 
 			// run multiple simulations and pick the best
 			let best = null;
+			let numTies = 1;
 			//for every possible way players can be split between red and blue
 			for (const { teamA, teamB } of getValidTeams()) {
 
 				//get every way players can be arranged within each team
 				const allPossibleTeamAs = getPossibleRoleAssignments(teamA);
 				const allPossibleTeamBs = getPossibleRoleAssignments(teamB);
-
 				//for every possible combination of each team check which has the lowest RELATIVE mmr difference
 				for (const TeamBlue of allPossibleTeamAs) {
 					for (const teamRed of allPossibleTeamBs) {
 						const total = TeamBlue.total + teamRed.total;
 						const relDiff = (Math.abs(TeamBlue.total - teamRed.total))/ total;
-		
-						if (!best || relDiff < best.relDiff) {
-							best = { relDiff, total, TeamBlue, teamRed };
+						const score = relDiff + roleDiffRMS*roleScoreWeighting;
+						//number of ties (teams with same score) so that if we have a multi way tie we dont just take the first result
+						
+						//if we dont have a best fit, we beat our best fit, or we tie in score but this results in higher average MMR (better role assignments)
+						if (!best || score < best.score || (score == best.score && total > best.total)) {
+							best = { relDiff, total, TeamBlue, teamRed, score };
+							numTies = 1; //reset ties
+						} else if ((score == best.score) && (total == best.total)) {
+							numTies+=1; //increment ties
+							//there is a 1/n chance to override the best score (n = num of lobbies that have the same score, 1/2 then 1/3 etc). This results in every tied lobby having an equal chance at being the final lobby
+							if (Math.random() < (1/numTies)){
+								best = { relDiff, total, TeamBlue, teamRed, score };
+							}
+
 						}
 					}
 				}
